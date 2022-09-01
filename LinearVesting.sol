@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.0;
 
 import "./utils/HasERC677TokenParent.sol";
 
 //Allow the vesting of multiple users using only one contract.
 
 contract LinearVesting is HasERC677TokenParent {
-    /// see IERC20.Transfer
+    //Events
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    // prettier-ignore
     event VestingBegin(
         uint256 startDate
     );
-
-    // prettier-ignore
+   
     event TokensReleased(
         uint256 indexed vestingId,
         address indexed beneficiary,
         uint256 amount
     );
 
-    // prettier-ignore
     event VestingCreated(
         uint256 indexed vestingId,
         address indexed beneficiary,
@@ -31,14 +28,12 @@ contract LinearVesting is HasERC677TokenParent {
         bool revocable
     );
 
-    // prettier-ignore
     event VestingRevoked(
         uint256 indexed vestingId,
         address indexed beneficiary,
         uint256 refund
     );
-
-    // prettier-ignore
+   
     event VestingTransfered(
         uint256 indexed vestingId,
         address indexed from,
@@ -78,14 +73,9 @@ contract LinearVesting is HasERC677TokenParent {
     /** always incrementing value to generate the next vesting id */
     uint256 _idCounter;
 
-    /**
-     * @notice Instanciate a new contract.
-     * @param crunch CRUNCH token address.
-     */
-    constructor(address crunch) HasERC677TokenParent(crunch) {}
-
+    //Param BIT Token Address
+    constructor(address bit) HasERC677TokenParent(bit) {}
   
-
     /**
      * @notice Create a new vesting. 
      *
@@ -113,8 +103,8 @@ contract LinearVesting is HasERC677TokenParent {
         uint256 duration,
         bool revocable
     ) external onlyOwner onlyWhenNotStarted {
-        require(beneficiaries.length == amounts.length, "MultiVesting: arrays are not the same length");
-        require(beneficiaries.length != 0, "MultiVesting: must vest at least one person");
+        require(beneficiaries.length == amounts.length, "Arrays are not the same length");
+        require(beneficiaries.length != 0, "Must vest at least one person");
         _requireVestInputs(duration);
 
         for (uint256 index = 0; index < beneficiaries.length; ++index) {
@@ -122,9 +112,11 @@ contract LinearVesting is HasERC677TokenParent {
         }
     }
 
+
+ //========= FUNCTIONS ======
     /**
-     * @notice Begin the vesting of everyone at a specified timestamp.
-     * @param timestamp Timestamp to use as a begin date.
+     * Globally Begin the vesting of everyone at a specified timestamp.
+     * @param timestamp Timestamp to use as a startDate.
      */
     function beginAt(uint256 timestamp) external onlyOwner {
         require(timestamp != 0, "Oops! Timestamp cannot be zero");
@@ -145,16 +137,15 @@ contract LinearVesting is HasERC677TokenParent {
         return _releaseAll(_msgSender());
     }
 
-   //Let Admin release vested tokens for a specified user
-    function releaseFor(uint256 vestingId) external onlyOwner returns (uint256) {
-        return _release(_getVesting(vestingId));
+    /**
+     * Revoke a vesting.     
+     * @param vestingId Vesting ID to revoke.
+     * @param sendBack Should the revoked tokens stay in the contract or be sent back to the owner?
+     */
+    function revoke(uint256 vestingId, bool sendBack) public onlyOwner returns (uint256) {
+        return _revoke(_getVesting(vestingId), sendBack);
     }
 
-  //Let Admin release vested tokens for all
-    function releaseAllFor(address beneficiary) external onlyOwner returns (uint256) {
-        return _releaseAll(beneficiary);
-    }
-  
       /**
      * @notice Transfer a vesting to another person.     
      * @param to Receiving address.
@@ -165,15 +156,6 @@ contract LinearVesting is HasERC677TokenParent {
     }
 
     /**
-     * Revoke a vesting.     
-     * @param vestingId Vesting ID to revoke.
-     * @param sendBack Should the revoked tokens stay in the contract or be sent back to the owner?
-     */
-    function revoke(uint256 vestingId, bool sendBack) public onlyOwner returns (uint256) {
-        return _revoke(_getVesting(vestingId), sendBack);
-    }
-
-        /**
      * @notice Send the available token back to the owner.
      */
     function emptyAvailableReserve() external onlyOwner {
@@ -186,7 +168,7 @@ contract LinearVesting is HasERC677TokenParent {
     
     //============ VIEWS=========
   /**
-     * @notice Get the remaining amount of token of a beneficiary.
+     * @notice Get the remaining amount of token of a beneficiary (unclaimed tokens)
      * @dev This function is to make wallets able to display the amount in their UI.
      * @param beneficiary Address to check.
      * @return balance The remaining amount of tokens.
@@ -200,7 +182,7 @@ contract LinearVesting is HasERC677TokenParent {
             balance += balanceOfVesting(vestingId);
         }
     }
-
+    
 
   //======= MUTATIVE VIEWS ========
    /**
@@ -351,8 +333,8 @@ contract LinearVesting is HasERC677TokenParent {
     function _transfer(Vesting storage vesting, address to) internal {
         address from = vesting.beneficiary;
 
-        require(from != to, "MultiVesting: cannot transfer to itself");
-        require(to != address(0), "MultiVesting: target is the zero address");
+        require(from != to, "LinearVesting: cannot transfer to itself");
+        require(to != address(0), "LinearVesting: target is the zero address");
 
         _removeOwnership(from, vesting.id);
         _addOwnership(to, vesting.id);
