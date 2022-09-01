@@ -55,6 +55,17 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     /** Currently total staked amount by everyone. This value does not include the rewards. */
     uint256 public totalStaked;
 
+    //======CONSTANTS======
+     uint256 public Titan = 50000* 1e18;
+     uint256 public Giant = 50000* 1e18; 
+     uint256 public Amazon = 25000* 1e18;
+     uint256 public Legend = 5000* 1e18;
+     uint256 public Warrior = 1* 1e18; 
+
+
+
+
+
     /** Initializes the contract by specifying the parent `BIT` and the initial `rewardPerDay`. */
     constructor(BitToken bit, uint256 _rewardPerDay)
         HasBitParent(bit)
@@ -63,7 +74,7 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     }
 
 //==============FUNCTIONS===================
-   //Deposit Your Tokens for Staking //User need to approve spending(allowance)
+   //Deposit Your Tokens for Staking //User need to approve spending
     function deposit(uint256 amount) external {
         bit.transferFrom(_msgSender(), address(this), amount);
 
@@ -83,6 +94,32 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     function totalStakedOf(address addr) external view returns (uint256) {
         return holders[addr].totalStaked;
     }
+
+
+    function poolPower(address addr) external view returns( uint256){
+       // Holder storage holder = holders[addr];
+
+        if ((holders[addr].totalStaked) >= 50000*1e18){
+            return 10;        
+        }
+        else if ((holders[addr].totalStaked) < 50000*1e18 && (holders[addr].totalStaked)>= 25000*1e18 ){
+            return 5;
+        }
+        else if ((holders[addr].totalStaked) < 25000*1e18 && (holders[addr].totalStaked)>= 10000*1e18 ){
+            return 3;
+        }
+        else if ((holders[addr].totalStaked) < 10000*1e18 && (holders[addr].totalStaked)>= 5000*1e18 ){
+            return 2;
+        }
+        else if ((holders[addr].totalStaked) < 50000*1e18 && (holders[addr].totalStaked)>= 1*1e18 ){
+            return 1;
+        }
+        else {
+            return 0;
+        }
+
+    }
+
 
     //Compute the earned reward of the specified `addr`.    
     function totalRewardOf(address addr) public view returns (uint256) {
