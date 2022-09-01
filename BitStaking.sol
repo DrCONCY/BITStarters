@@ -7,7 +7,7 @@ import "./BitStarters.sol";
 
 /**
  * Staking contract for the BIT token.
- * Transfer Reward Token
+ * Transfer Reward Token(BIT Token)
  * To start staking, users have to approve and Deposit their tokens to receive the reward tokens 
  
  */
@@ -21,7 +21,7 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
 
     event EmergencyWithdrawed(address indexed to, uint256 staked);
     event Deposited(address indexed sender, uint256 amount);
-    event RewardPerDayUpdated(uint256 rewardPerDay, uint256 totalDebt);
+    event RewardPerMilPerDayUpdated(uint256 rewardPerMilPerDay, uint256 totalDebt);
 
     struct Holder {
         /** Index in `addresses`, used for faster lookup in case of a remove. */
@@ -43,8 +43,8 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
         uint256 start;
     }
 
-    /** The `rewardPerDay` is the amount of tokens rewarded for staking 1 million tokens staked over a 1 day period. */
-    uint256 public rewardPerDay;
+    /** The `rewardPerMilDay` is the amount of tokens rewarded for staking 1 million tokens staked over a 1 day period. */
+    uint256 public rewardPerMilPerDay;
 
     /** List of all currently staking addresses. Used for looping. */
     address[] public addresses;
@@ -55,22 +55,12 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     /** Currently total staked amount by everyone. This value does not include the rewards. */
     uint256 public totalStaked;
 
-    //======CONSTANTS======
-     uint256 public Titan = 50000* 1e18;
-     uint256 public Giant = 50000* 1e18; 
-     uint256 public Amazon = 25000* 1e18;
-     uint256 public Legend = 5000* 1e18;
-     uint256 public Warrior = 1* 1e18; 
 
-
-
-
-
-    /** Initializes the contract by specifying the parent `BIT` and the initial `rewardPerDay`. */
-    constructor(BitToken bit, uint256 _rewardPerDay)
+    /** Initializes the contract by specifying the parent `BIT` and the initial `rewardPerMilPerDay`. */
+    constructor(BitToken bit, uint256 _rewardPerMilPerDay)
         HasBitParent(bit)
     {
-        rewardPerDay = _rewardPerDay;
+        rewardPerMilPerDay = _rewardPerMilPerDay;
     }
 
 //==============FUNCTIONS===================
@@ -88,16 +78,20 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     }
 
 //==========VIEWS================
-  //totalStaked = balance - reserve
-
-  //Return the total stake of the specified addresses
+  //Return the total stake of a holder
     function totalStakedOf(address addr) external view returns (uint256) {
         return holders[addr].totalStaked;
     }
 
+    //Return the earned reward of the specified `addr`.    
+    function totalRewardOf(address addr) public view returns (uint256) {
+        Holder storage holder = holders[addr];
+        return _computeRewardOf(holder);
+    }
 
-    function poolPower(address addr) external view returns( uint256){
-       // Holder storage holder = holders[addr];
+    //Return poolPower of a holder
+    //poolPower is a function of the tier
+    function poolPower(address addr) external view returns( uint256){      
 
         if ((holders[addr].totalStaked) >= 50000*1e18){
             return 10;        
@@ -120,25 +114,17 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
 
     }
 
-
-    //Compute the earned reward of the specified `addr`.    
-    function totalRewardOf(address addr) public view returns (uint256) {
-        Holder storage holder = holders[addr];
-        return _computeRewardOf(holder);
-    }
-
     //Get the number of addresses currently staking/Unique Stakers     
     function stakerCount() external view returns (uint256) {
         return addresses.length;
     }
 
-
 //============MUTATIVES===========
 
      // Update the reward per day.  
-    function setRewardPerDay(uint256 to) external onlyOwner {
+    function setRewardPerMilPerDay(uint256 to) external onlyOwner {
         require(
-            rewardPerDay != to,
+            rewardPerMilPerDay != to,
             "Staking: reward per day value must be different current RewardPayDay"
         );
         require(
@@ -147,11 +133,29 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
         );
 
         uint256 debt = _updateDebts();
-        rewardPerDay = to;
+        rewardPerMilPerDay = to;
 
-        emit RewardPerDayUpdated(rewardPerDay, debt);
+        emit RewardPerMilPerDayUpdated(rewardPerMilPerDay, debt);
     }
 
+    //Returns the current reserve for rewards = the contract balance - the total staked.    
+    function reserve() public view returns (uint256) {
+        uint256 balance = contractBalance();
+
+        if (totalStaked > balance) {
+            revert(
+                "Staking: the balance has less BIT than the total staked"
+            );
+        }
+        return balance - totalStaked;
+    }
+
+    //return The current staking contract's balance     
+    function contractBalance() public view returns (uint256) {
+        return bit.balanceOf(address(this));
+    }
+
+    //=======Internal Logics======
      /**
      * Deposit Logic
      * @dev If the depositor is not currently holding, the `Holder.start` is set and his address is added to the addresses list.
@@ -224,23 +228,6 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
         return holders[addr].stakes.length;
     }
 
-    //return The current staking contract's balance     
-    function contractBalance() public view returns (uint256) {
-        return bit.balanceOf(address(this));
-    }
-
-    //Returns the current reserve for rewards = the contract balance - the total staked.    
-    function reserve() public view returns (uint256) {
-        uint256 balance = contractBalance();
-
-        if (totalStaked > balance) {
-            revert(
-                "Staking: the balance has less BIT than the total staked"
-            );
-        }
-        return balance - totalStaked;
-    }
-    
     //Test if an address is currently staking.    
     function isStaking(address addr) public view returns (bool) {
         return _isStaking(holders[addr]);
@@ -352,7 +339,7 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
     {
         uint256 numberOfDays = ((block.timestamp - stake.start) / 1 days);
 
-        return (stake.amount * numberOfDays * rewardPerDay) / 1_000_000;
+        return (stake.amount * numberOfDays * rewardPerMilPerDay) / 1_000_000;
     }
 
   /** @dev Internal function called when the {IERC677-transferAndCall} is used. */
