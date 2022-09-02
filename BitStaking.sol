@@ -8,8 +8,7 @@ import "./BitStarters.sol";
 /**
  * Staking contract for the BIT token.
  * Transfer Reward Token(BIT Token)
- * To start staking, users have to approve and Deposit their tokens to receive the reward tokens 
- 
+ * To start staking, users have to approve and Deposit their tokens to receive the reward tokens  
  */
 contract StakingRewards is HasBitParent, IERC677Receiver {
     event Withdrawed(
@@ -54,7 +53,8 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
 
     /** Currently total staked amount by everyone. This value does not include the rewards. */
     uint256 public totalStaked;
-
+    
+    //string public  = Titan;
 
     /** Initializes the contract by specifying the parent `BIT` and the initial `rewardPerMilPerDay`. */
     constructor(BitToken bit, uint256 _rewardPerMilPerDay)
@@ -91,21 +91,36 @@ contract StakingRewards is HasBitParent, IERC677Receiver {
 
     //Return poolPower of a holder
     //poolPower is a function of the tier
-    function poolPower(address addr) external view returns( uint256){      
+    function bitPower(address addr) external view returns( uint256){      
 
         if ((holders[addr].totalStaked) >= 50000*1e18){
             return 10;        
         }
+         else if ((holders[addr].totalStaked) < 50000*1e18 && (holders[addr].totalStaked)>= 45000*1e18 ){
+            return 9; 
+        }
+         else if ((holders[addr].totalStaked) < 45000*1e18 && (holders[addr].totalStaked)>= 40000*1e18 ){
+            return 8;
+        }
+        else if ((holders[addr].totalStaked) < 40000*1e18 && (holders[addr].totalStaked)>= 35000*1e18 ){
+            return 7;
+        }
+        else if ((holders[addr].totalStaked) < 35000*1e18 && (holders[addr].totalStaked)>= 30000*1e18 ){
+            return 6;
+        }        
         else if ((holders[addr].totalStaked) < 50000*1e18 && (holders[addr].totalStaked)>= 25000*1e18 ){
             return 5;
         }
-        else if ((holders[addr].totalStaked) < 25000*1e18 && (holders[addr].totalStaked)>= 10000*1e18 ){
+        else if ((holders[addr].totalStaked) < 25000*1e18 && (holders[addr].totalStaked)>= 20000*1e18 ){
+            return 4;
+        }
+        else if ((holders[addr].totalStaked) < 20000*1e18 && (holders[addr].totalStaked)>= 15000*1e18 ){
             return 3;
         }
-        else if ((holders[addr].totalStaked) < 10000*1e18 && (holders[addr].totalStaked)>= 5000*1e18 ){
+        else if ((holders[addr].totalStaked) < 15000*1e18 && (holders[addr].totalStaked)>= 10000*1e18 ){
             return 2;
         }
-        else if ((holders[addr].totalStaked) < 50000*1e18 && (holders[addr].totalStaked)>= 1*1e18 ){
+        else if ((holders[addr].totalStaked) < 1*1e18 && (holders[addr].totalStaked)>= 5000*1e18 ){
             return 1;
         }
         else {
