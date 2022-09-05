@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 //Vesting Schedule contract
 
-contract SHOvesting is Ownable, ReentrancyGuard {
+contract shoVesting is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint32 constant HUNDRED_PERCENT = 1e6;
@@ -19,12 +19,13 @@ contract SHOvesting is Ownable, ReentrancyGuard {
         uint8 option;
 
         uint128 allocation;
+        uint128 totalUnlocked;
+        uint128 totalClaimed;
         uint32 unlockedBatchesCount;
         uint32 feePercentageCurrentUnlock;
         uint32 feePercentageNextUnlock;
 
-        uint128 totalUnlocked;
-        uint128 totalClaimed;
+
     }
 
     mapping(address => User) public users;
@@ -132,8 +133,7 @@ contract SHOvesting is Ownable, ReentrancyGuard {
         address[] calldata userAddresses,
         uint128[] calldata allocations,
         uint8[] calldata options
-    ) external onlyOwner {
-        require(shoToken.balanceOf(address(this)) == 0, "SHO: whitelisting too late");
+    ) external onlyOwner {        
         require(userAddresses.length != 0, "SHO: zero length array");
         require(userAddresses.length == allocations.length, "SHO: different array lengths");
         require(userAddresses.length == options.length, "SHO: different array lengths");
@@ -213,6 +213,29 @@ contract SHOvesting is Ownable, ReentrancyGuard {
             baseFee, 
             extraFee
         );
+    }
+    
+//==== 4 Views======
+
+/**
+ View 1: AvailaibleToClaim
+ View 2 Claim Button
+ View 3 Total Allocation
+ View 4 Total Claimed
+*/
+    function getTotalAllocation() external view returns (uint256){
+        User memory user = users[msg.sender];
+        return (user.allocation);
+    }  
+    
+    function getAvailaibleToClaimed() external view returns (uint256){
+        User memory user = users[msg.sender];
+        return (user.totalUnlocked - user.totalClaimed);
+    }
+
+    function getTotalClaimed() external view returns (uint256){
+        User memory user = users[msg.sender];
+        return (user.totalClaimed);
     }
 
     /**
@@ -335,3 +358,5 @@ contract SHOvesting is Ownable, ReentrancyGuard {
         return sumArray;
     }
 }
+
+
