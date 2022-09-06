@@ -91,7 +91,7 @@ contract LinearVesting is HasERC677TokenParent {
         uint256 duration,
         bool revocable
     ) external onlyOwner onlyWhenNotStarted {
-        _requireVestInputs(duration);
+        require(duration > 0, "LinearVesting: Duration should be greater than zero");
         _vest(beneficiary, amount, cliffDuration, duration, revocable);
     }
 
@@ -105,13 +105,12 @@ contract LinearVesting is HasERC677TokenParent {
     ) external onlyOwner onlyWhenNotStarted {
         require(beneficiaries.length == amounts.length, "Arrays are not the same length");
         require(beneficiaries.length != 0, "Must vest at least one person");
-        _requireVestInputs(duration);
+        require(duration > 0, "LinearVesting: Duration should be greater than zero");
 
         for (uint256 index = 0; index < beneficiaries.length; ++index) {
             _vest(beneficiaries[index], amounts[index], cliffDuration, duration, revocable);
         }
     }
-
 
  //========= FUNCTIONS ======
     /**
@@ -120,7 +119,6 @@ contract LinearVesting is HasERC677TokenParent {
      */
     function beginAt(uint256 timestamp) external onlyOwner {
         require(timestamp != 0, "Oops! Timestamp cannot be zero");
-
         _begin(timestamp);
     }
 
@@ -132,7 +130,7 @@ contract LinearVesting is HasERC677TokenParent {
         return _release(_getVesting(vestingId, _msgSender()));
     }
 
-   //Release all tokes that has vested    
+   //Release all unlocked tokens that has vested    
     function releaseAll() external returns (uint256) {
         return _releaseAll(_msgSender());
     }
@@ -160,7 +158,7 @@ contract LinearVesting is HasERC677TokenParent {
      */
     function emptyAvailableReserve() external onlyOwner {
         uint256 available = availableReserve();
-        require(available > 0, "Ooops!: no token available");
+        require(available > 0, "LinearVesting:: no token available");
 
         parentToken.transfer(owner(), available);
     }
@@ -168,10 +166,9 @@ contract LinearVesting is HasERC677TokenParent {
     
     //============ VIEWS=========
   /**
-     * @notice Get the remaining amount of token of a beneficiary (unclaimed tokens)
-     * @dev This function is to make wallets able to display the amount in their UI.
+     * @notice Get the remaining amount of token of a beneficiary (unclaimed tokens)    
      * @param beneficiary Address to check.
-     * @return balance The remaining amount of tokens.
+     * @return balance The remaining amount of tokens(locked tokens)
      */
     function balanceOf(address beneficiary) external view returns (uint256 balance) {
         uint256[] storage indexes = owned[beneficiary];
@@ -183,6 +180,15 @@ contract LinearVesting is HasERC677TokenParent {
         }
     }
     
+     /**
+    function amountVested(address beneficiary) external view returns (uint256) {
+        uint256[] storage indexes = owned[beneficiary];
+        for (uint256 index = 0; index < indexes.length; ++index) {
+            uint256 vestingId = indexes[index];       
+        
+    }
+
+    */
 
   //======= MUTATIVE VIEWS ========
    /**
@@ -193,10 +199,7 @@ contract LinearVesting is HasERC677TokenParent {
         return parentToken.balanceOf(address(this));
     }
 
-    /**
-     * @notice Get the available reserve.
-     * @return The number of CRUNCH that can be used to create another vesting.
-     */
+    //return The number of BIT that can be used to create another vesting.
     function availableReserve() public view returns (uint256) {
         return reserve() - totalSupply;
     }
@@ -210,90 +213,21 @@ contract LinearVesting is HasERC677TokenParent {
         return "vBIT";
     }
 
-//====== INTERNAL LOGICS =========
-    /**
-     * @notice Test if an address is the beneficiary of a vesting.
-     * @return `true` if the address is the beneficiary of the vesting, `false` otherwise.
-     */
-    function isBeneficiary(uint256 vestingId, address account) public view returns (bool) {
-        return _isBeneficiary(_getVesting(vestingId), account);
-    }
-
-    /**
-     * @notice Test if an address has at least one vesting.
-     * @return `true` if the address has one or more vesting.
-     */
-    function isVested(address beneficiary) public view returns (bool) {
-        return ownedCount(beneficiary) != 0;
-    }
-
-    /**
-     * @notice Get the releasable amount of tokens.
-     * @param vestingId Vesting ID to check.
-     * @return The releasable amounts.
-     */
-    function releasableAmount(uint256 vestingId) public view returns (uint256) {
-        return _releasableAmount(_getVesting(vestingId));
-    }
-
-    /**
-     * @notice Get the vested amount of tokens.
-     * @param vestingId Vesting ID to check.
-     * @return The vested amount of the vestings.
-     */
-    function vestedAmount(uint256 vestingId) public view returns (uint256) {
-        return _vestedAmount(_getVesting(vestingId));
-    }
-
-    /**
-     * @notice Get the number of vesting for an address.
-     * @param beneficiary Address to check.
-     * @return The amount of vesting for the address.
-     */
+    //Get the number of vesting for an address.
     function ownedCount(address beneficiary) public view returns (uint256) {
         return owned[beneficiary].length;
     }
 
-  
-    /**
-     * @notice Get the remaining amount of token of a specified vesting.
-     * @param vestingId Vesting ID to check.
-     * @return The remaining amount of tokens.
-     */
-    function balanceOfVesting(uint256 vestingId) public view returns (uint256) {
-        return _balanceOfVesting(_getVesting(vestingId));
-    }
-
-    /**
-     * @notice Get the remaining amount of token of a specified vesting.
-     * @param vesting Vesting to check.
-     * @return The remaining amount of tokens.
-     */
-    function _balanceOfVesting(Vesting storage vesting) internal view returns (uint256) {
-        return vesting.amount - vesting.released;
-    }
-
-    /**
-     * @notice Begin the vesting for everyone.
-     * @param timestamp Timestamp to use for the start date.
-     * @dev A `VestingBegin` event will be emitted.
-     */
+   //====== FUNCTIONS Internal Logic =======
+   
+     //Begin the vesting for everyone at a specified timeStamp
     function _begin(uint256 timestamp) internal onlyWhenNotStarted {
         startDate = timestamp;
 
         emit VestingBegin(startDate);
     }
 
-    /**
-     * @notice Check the shared inputs of a vest method.
-     */
-    function _requireVestInputs(uint256 duration) internal pure {
-        require(duration > 0, "MultiVesting: duration is 0");
-    }
-
-    /**
-     * @notice Create a vesting.
-     */
+    // Create a Vesting
     function _vest(
         address beneficiary,
         uint256 amount,
@@ -301,9 +235,9 @@ contract LinearVesting is HasERC677TokenParent {
         uint256 duration,
         bool revocable
     ) internal {
-        require(beneficiary != address(0), "MultiVesting: beneficiary is the zero address");
-        require(amount > 0, "MultiVesting: amount is 0");
-        require(availableReserve() >= amount, "MultiVesting: available reserve is not enough");
+        require(beneficiary != address(0), "LinearVesting: beneficiary is the zero address");
+        require(amount > 0, "LinearVesting: amount is 0");
+        require(availableReserve() >= amount, "LinearVesting: available reserve is not enough");
 
         uint256 vestingId = _idCounter++; /* post-increment */
 
@@ -327,13 +261,12 @@ contract LinearVesting is HasERC677TokenParent {
         emit Transfer(address(0), beneficiary, amount);
     }
 
-    /**
-     * @notice Transfer a vesting to another address.
-     */
+
+    //Transfer a vesting to another address.
     function _transfer(Vesting storage vesting, address to) internal {
         address from = vesting.beneficiary;
 
-        require(from != to, "LinearVesting: cannot transfer to itself");
+        require(from != to, "LinearVesting:: cannot transfer to itself");
         require(to != address(0), "LinearVesting: target is the zero address");
 
         _removeOwnership(from, vesting.id);
@@ -345,23 +278,36 @@ contract LinearVesting is HasERC677TokenParent {
         emit Transfer(from, to, _balanceOfVesting(vesting));
     }
 
-    /**
-     * @dev Internal implementation of the release() method.
-     * @dev The methods will fail if there is no tokens due.
-     * @dev A `TokensReleased` event will be emitted.
-     * @param vesting Vesting to release.
-     */
+
+    // Revoke a vesting and send the extra CRUNCH back to the owner.
+    function _revoke(Vesting storage vesting, bool sendBack) internal returns (uint256 refund) {
+        require(vesting.revocable, "MultiVesting: token not revocable");
+        require(!vesting.revoked, "MultiVesting: token already revoked");
+
+        uint256 unreleased = _releasableAmount(vesting);
+        refund = vesting.amount - vesting.released - unreleased;
+
+        vesting.revoked = true;
+        vesting.amount -= refund;
+        totalSupply -= refund;
+
+        if (sendBack) {
+            parentToken.transfer(owner(), refund);
+        }
+
+        emit VestingRevoked(vesting.id, vesting.beneficiary, refund);
+        emit Transfer(vesting.beneficiary, address(0), refund);
+    }
+
+    //Internal implementation of the release() method.
+    //The methods will fail if there is no tokens due.
     function _release(Vesting storage vesting) internal returns (uint256 unreleased) {
         unreleased = _doRelease(vesting);
         _checkAmount(unreleased);
     }
 
-    /**
-     * @dev Internal implementation of the releaseAll() method.
-     * @dev The methods will fail if there is no tokens due.
-     * @dev `TokensReleased` events will be emitted.
-     * @param beneficiary Address to release all vesting from.
-     */
+
+    // Internal implementation of the releaseAll() method.
     function _releaseAll(address beneficiary) internal returns (uint256 unreleased) {
         uint256[] storage indexes = owned[beneficiary];
 
@@ -399,28 +345,68 @@ contract LinearVesting is HasERC677TokenParent {
     function _checkAmount(uint256 unreleased) internal pure {
         require(unreleased > 0, "MultiVesting: no tokens are due");
     }
+ 
+
+ //====== INTERNAL LOGICS =========
+
+    //Test if an address is the beneficiary of a vesting.
+    function isBeneficiary(uint256 vestingId, address account) public view returns (bool) {
+        return _isBeneficiary(_getVesting(vestingId), account);
+    }
+
+    //Test if an address has at least one vesting.
+    function isVested(address beneficiary) public view returns (bool) {
+        return ownedCount(beneficiary) != 0;
+    }
+
 
     /**
-     * @dev Revoke a vesting and send the extra CRUNCH back to the owner.
+     * @notice Get the releasable amount of tokens.
+     * @param vestingId Vesting ID to check.
+     * @return The releasable amounts.
      */
-    function _revoke(Vesting storage vesting, bool sendBack) internal returns (uint256 refund) {
-        require(vesting.revocable, "MultiVesting: token not revocable");
-        require(!vesting.revoked, "MultiVesting: token already revoked");
-
-        uint256 unreleased = _releasableAmount(vesting);
-        refund = vesting.amount - vesting.released - unreleased;
-
-        vesting.revoked = true;
-        vesting.amount -= refund;
-        totalSupply -= refund;
-
-        if (sendBack) {
-            parentToken.transfer(owner(), refund);
-        }
-
-        emit VestingRevoked(vesting.id, vesting.beneficiary, refund);
-        emit Transfer(vesting.beneficiary, address(0), refund);
+    function releasableAmount(uint256 vestingId) public view returns (uint256) {
+        return _releasableAmount(_getVesting(vestingId));
     }
+
+    /**
+     * @notice Get the vested amount of tokens.
+     * @param vestingId Vesting ID to check.
+     * @return The vested amount of the vestings.
+     */
+    //Get total vestedAmount for a specified vesting ID
+    function vestedAmount(uint256 vestingId) public view returns (uint256) {
+        return _vestedAmount(_getVesting(vestingId));
+    }
+
+  
+    /**
+     * @notice Get the remaining amount of token of a specified vesting.
+     * @param vestingId Vesting ID to check.
+     * @return The remaining amount of tokens.
+     */
+    function balanceOfVesting(uint256 vestingId) public view returns (uint256) {
+        return _balanceOfVesting(_getVesting(vestingId));
+    }
+
+
+    /**
+     * @notice Get the remaining amount of token of a specified vesting.
+     * @param vesting Vesting to check.
+     * @return The remaining amount of tokens.
+     */
+    function _balanceOfVesting(Vesting storage vesting) internal view returns (uint256) {
+        return vesting.amount - vesting.released;
+    }
+
+    function _userTotalAmount(Vesting storage vesting) internal view returns (uint256) {
+        return vesting.amount ;
+    }
+
+    function _userReleasedAmount(Vesting storage vesting) internal view returns (uint256) {
+        return vesting.released ;
+    }
+
 
     /**
      * @dev Test if the vesting's beneficiary is the same as the specified address.
@@ -429,18 +415,15 @@ contract LinearVesting is HasERC677TokenParent {
         return vesting.beneficiary == account;
     }
 
-    /**
-     * @dev Compute the releasable amount.
-     * @param vesting Vesting instance.
-     */
+//=====COMPUTATION=====
+   
+   //Compute the releasable amount.
     function _releasableAmount(Vesting memory vesting) internal view returns (uint256) {
         return _vestedAmount(vesting) - vesting.released;
     }
 
-    /**
-     * @dev Compute the vested amount.
-     * @param vesting Vesting instance.
-     */
+
+    //Compute the vested amount.
     function _vestedAmount(Vesting memory vesting) internal view returns (uint256) {
         if (startDate == 0) {
             return 0;
