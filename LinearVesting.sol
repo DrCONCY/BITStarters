@@ -349,16 +349,14 @@ contract LinearVesting is HasERC677TokenParent {
 
  //====== INTERNAL LOGICS =========
 
-    //Test if an address is the beneficiary of a vesting.
-    function isBeneficiary(uint256 vestingId, address account) public view returns (bool) {
-        return _isBeneficiary(_getVesting(vestingId), account);
+    /**
+     * @notice Get the vested amount of tokens.
+     * @param vestingId Vesting ID to check.
+     * @return The vested amount of the vestings.
+     */   
+    function vestedAmount(uint256 vestingId) public view returns (uint256) {
+        return _vestedAmount(_getVesting(vestingId));
     }
-
-    //Test if an address has at least one vesting.
-    function isVested(address beneficiary) public view returns (bool) {
-        return ownedCount(beneficiary) != 0;
-    }
-
 
     /**
      * @notice Get the releasable amount of tokens.
@@ -370,17 +368,6 @@ contract LinearVesting is HasERC677TokenParent {
     }
 
     /**
-     * @notice Get the vested amount of tokens.
-     * @param vestingId Vesting ID to check.
-     * @return The vested amount of the vestings.
-     */
-    //Get total vestedAmount for a specified vesting ID
-    function vestedAmount(uint256 vestingId) public view returns (uint256) {
-        return _vestedAmount(_getVesting(vestingId));
-    }
-
-  
-    /**
      * @notice Get the remaining amount of token of a specified vesting.
      * @param vestingId Vesting ID to check.
      * @return The remaining amount of tokens.
@@ -390,38 +377,7 @@ contract LinearVesting is HasERC677TokenParent {
     }
 
 
-    /**
-     * @notice Get the remaining amount of token of a specified vesting.
-     * @param vesting Vesting to check.
-     * @return The remaining amount of tokens.
-     */
-    function _balanceOfVesting(Vesting storage vesting) internal view returns (uint256) {
-        return vesting.amount - vesting.released;
-    }
-
-    function _userTotalAmount(Vesting storage vesting) internal view returns (uint256) {
-        return vesting.amount ;
-    }
-
-    function _userReleasedAmount(Vesting storage vesting) internal view returns (uint256) {
-        return vesting.released ;
-    }
-
-
-    /**
-     * @dev Test if the vesting's beneficiary is the same as the specified address.
-     */
-    function _isBeneficiary(Vesting storage vesting, address account) internal view returns (bool) {
-        return vesting.beneficiary == account;
-    }
-
-//=====COMPUTATION=====
-   
-   //Compute the releasable amount.
-    function _releasableAmount(Vesting memory vesting) internal view returns (uint256) {
-        return _vestedAmount(vesting) - vesting.released;
-    }
-
+//===========COMPUTATION================ 
 
     //Compute the vested amount.
     function _vestedAmount(Vesting memory vesting) internal view returns (uint256) {
@@ -442,6 +398,16 @@ contract LinearVesting is HasERC677TokenParent {
         return (vesting.amount * (block.timestamp - cliffEnd)) / vesting.duration;
     }
 
+    //Compute the releasable amount.
+    function _releasableAmount(Vesting memory vesting) internal view returns (uint256) {
+        return _vestedAmount(vesting) - vesting.released;
+    }
+
+    //Compute balance(locked tokens)
+    function _balanceOfVesting(Vesting storage vesting) internal view returns (uint256) {
+        return vesting.amount - vesting.released;
+    }
+
     /**
      * @dev Get a vesting.
      * @return vesting struct stored in the storage.
@@ -460,6 +426,25 @@ contract LinearVesting is HasERC677TokenParent {
         vesting = _getVesting(vestingId);
         require(vesting.beneficiary == beneficiary, "MultiVesting: not the beneficiary");
     }
+
+   //Test if an address is the beneficiary of a vesting.
+    function isBeneficiary(uint256 vestingId, address account) public view returns (bool) {
+        return _isBeneficiary(_getVesting(vestingId), account);
+    }
+
+    /**
+     * @dev Test if the vesting's beneficiary is the same as the specified address.
+     */
+    function _isBeneficiary(Vesting storage vesting, address account) internal view returns (bool) {
+        return vesting.beneficiary == account;
+    }
+
+    //Test if an address has at least one vesting.
+    function isVested(address beneficiary) public view returns (bool) {
+        return ownedCount(beneficiary) != 0;
+    }
+
+
 
     /**
      * @dev Remove the vesting from the ownership mapping.
