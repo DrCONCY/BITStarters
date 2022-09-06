@@ -165,12 +165,9 @@ contract LinearVesting is HasERC677TokenParent {
 
     
     //============ VIEWS=========
-  /**
-     * @notice Get the remaining amount of token of a beneficiary (unclaimed tokens)    
-     * @param beneficiary Address to check.
-     * @return balance The remaining amount of tokens(locked tokens)
-     */
-    function balanceOf(address beneficiary) external view returns (uint256 balance) {
+
+    //Return user's locked tokens
+    function lockedTokens(address beneficiary) external view returns (uint256 balance) {
         uint256[] storage indexes = owned[beneficiary];
 
         for (uint256 index = 0; index < indexes.length; ++index) {
@@ -180,15 +177,17 @@ contract LinearVesting is HasERC677TokenParent {
         }
     }
     
-     /**
-    function amountVested(address beneficiary) external view returns (uint256) {
+    //Return user's unlocked tokens
+    function unlockedTokens(address beneficiary) external view returns (uint256 balance) {
         uint256[] storage indexes = owned[beneficiary];
+
         for (uint256 index = 0; index < indexes.length; ++index) {
-            uint256 vestingId = indexes[index];       
-        
+            uint256 vestingId = indexes[index];
+
+            balance += vestedAmount(vestingId);
+        }
     }
 
-    */
 
   //======= MUTATIVE VIEWS ========
    /**
@@ -379,7 +378,7 @@ contract LinearVesting is HasERC677TokenParent {
 
 //===========COMPUTATION================ 
 
-    //Compute the vested amount.
+    //Compute the vested amount(unlocked tokens)
     function _vestedAmount(Vesting memory vesting) internal view returns (uint256) {
         if (startDate == 0) {
             return 0;
@@ -443,7 +442,6 @@ contract LinearVesting is HasERC677TokenParent {
     function isVested(address beneficiary) public view returns (bool) {
         return ownedCount(beneficiary) != 0;
     }
-
 
 
     /**
