@@ -7,14 +7,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./SHOtoken.sol"; //Mintable Token that is being sold
 
+// presale contract with 3 tiers priorityList(capped), whitelist(capped), and FCFS round
+
 contract Presale is Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
     struct UserInfo{
         address user;
-        uint amount; // amount of USDT deposited by user
-               
+        uint amount; // amount of USDT deposited by user               
     }
 
     mapping(address => UserInfo) public sales;
@@ -29,17 +30,16 @@ contract Presale is Ownable {
      uint256 public price = 1* 1e16; // 0.01 USDT per SHO
      uint256 public fcfsMinCap = 50 * 1e18; // $50 Minimum deposit for FCFS
      uint256 public fcfsMaxCap = 500 * 1e18; // $500 Ma deposit for FCFS
-     uint256 public minPurchase = 100 * 1e18; // 100 USDT Minimum Purchase
-     uint256 public maxPurchase = 200 * 1e18; // 200 USDT cap for each whitelisted user
+     uint256 public minCapWL = 100 * 1e18; // 100 USDT Minimum Purchase
+     uint256 public maxCapWL = 200 * 1e18; // 200 USDT cap for each whitelisted user
     uint256 public maxCap = 500 * 1e18; // 200 USDT cap for each whitelisted user
-    uint256 public minCap = 100 * 1e18; // 100 USDT minmumPurchsecap for each whitelisted user
+    uint256 public minCap = 100 * 1e18; // 100 USDT minmum Purchase for each whitelisted user
 
-    IERC20 public USDT = IERC20(0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8); //Address of the ERC20 token used for purchase
+    IERC20 public USDT = IERC20(0xb1E8D46B9A5e14128B0bf028921A35e0E3471bA7); //Address of the ERC20 token used for purchase
     
-    uint256 public firstRoundDeposits; //total amount deposited by users in Round1
+    uint256 public priorityListDeposits; //total amount deposited by users in prirityList
+    uint256 public whitelistDeposits; // total amount deposited by users in whitelist
     uint256 public secondRoundDeposits;  //total amount deposited by users in Round2
-   // uint256 public firstRound;  //total amount deposited by users in Round2
-   // uint256 public secondRound;  //total amount deposited by users in Round2
     
     mapping(address => bool) public whitelisted; // True if user is whitelisted
     mapping(address => bool) public priorityList; // True if user is in priority list
@@ -112,18 +112,18 @@ contract Presale is Ownable {
         end = block.timestamp + duration;
     }    
     
-    //Deposits from PriorityList Addresses capped  at maxCap
+    //Deposits from priorityList Addresses capped  at maxCap
     function depositPL(uint USDTAmount) external idoActive(){
-        UserInfo storage firstRound = sales[msg.sender];
-        require( maxCap >= firstRound.amount.add(USDTAmount), "PriorityList address is capped at $500");
-        firstRound.amount = firstRound.amount.add(USDTAmount);
+        UserInfo storage user = sales[msg.sender];
+        require( maxCap >= user.amount.add(USDTAmount), "PriorityList address is capped at $500");
+        user.amount = user.amount.add(USDTAmount); //adds amount deposited by user
 
         require(USDTAmount >= minCap && USDTAmount <= maxCap, "Min $100, Max $500");
         uint tokenAmount = USDTAmount.div(price);
         require(priorityList[msg.sender] == true, "Sorry! Address not in PriorityList.");        
         require(tokenAmount <= availableTokens,"Not Enough Token Left for sale");     
    
-        firstRoundDeposits = firstRoundDeposits.add(USDTAmount);    
+        priorityListDeposits = priorityListDeposits.add(USDTAmount); //amount deposited by users in PL   
         
         USDT.transferFrom(msg.sender, address(this), USDTAmount);
         token.mint(address(this), tokenAmount);
@@ -131,18 +131,18 @@ contract Presale is Ownable {
     }
 
 
-    //Deposits from Whitelistd Addresses capped  at maxPurchase
+    //Deposits from Whitelisted Addresses capped  at maxCapWL
     function depositWL(uint USDTAmount) external idoActive(){
-        UserInfo storage firstRound = sales[msg.sender];
-        require( maxPurchase >= firstRound.amount.add(USDTAmount), "Whilisted address is capped at $200");
-        firstRound.amount = firstRound.amount.add(USDTAmount);
+        UserInfo storage user = sales[msg.sender];
+        require( maxCapWL >= user.amount.add(USDTAmount), "Whilisted address is capped at $200");
+        user.amount = user.amount.add(USDTAmount);
 
-        require(USDTAmount >= minPurchase && USDTAmount <= maxPurchase, "Min $100, Max $200");
+        require(USDTAmount >= minCapWL && USDTAmount <= maxCapWL, "Min $100, Max $200");
         uint tokenAmount = USDTAmount.div(price);
         require(whitelisted[msg.sender] == true, "Sorry! Address not whitelisted.");        
         require(tokenAmount <= availableTokens,"Not Enough Token Left for sale");     
    
-        firstRoundDeposits = firstRoundDeposits.add(USDTAmount);    
+        whitelistDeposits = whitelistDeposits.add(USDTAmount); ///amount deposited by users in WL   
         
         USDT.transferFrom(msg.sender, address(this), USDTAmount);
         token.mint(address(this), tokenAmount);
@@ -151,8 +151,8 @@ contract Presale is Ownable {
 
      //FCFS deposits with Maxbuy but uncapped  
     function depositFC(uint USDTAmount) external idoActive(){
-        UserInfo storage secondRound = sales[msg.sender];
-        secondRound.amount = secondRound.amount.add(USDTAmount);
+        UserInfo storage user = sales[msg.sender];
+        user.amount = user.amount.add(USDTAmount);
         
         require(USDTAmount >= fcfsMinCap && USDTAmount <= fcfsMaxCap, "Min $50, Max $500");
         uint tokenAmount = USDTAmount.div(price);        
@@ -171,19 +171,16 @@ contract Presale is Ownable {
 
     //Get totalRaised amount
     function totalRaised() external view returns ( uint256 ) {      
-        return firstRoundDeposits.add(secondRoundDeposits);
+        return priorityListDeposits.add(whitelistDeposits).add(secondRoundDeposits);
     }
 
-/**
+
     //Get Amount Deposited by Each User
     function userDeposit(address _user) external view returns ( uint256 ) {
-       UserInfo memory firstRoundPurchase = sales[_user];
-       UserInfo memory secondRoundPurchase = sales[_user];
+       UserInfo memory user = sales[_user];      
 
-        return (secondRound.amount);
-    }
-*/
-   
+        return (user.amount);
+    }   
 
      modifier idoActive(){
     require (end > 0 && block.timestamp < end && availableTokens > 0, "ido must be active");
