@@ -30,13 +30,19 @@ contract Presale is Ownable {
      uint256 public fcfsMinCap = 50 * 1e18; // $50 Minimum deposit for FCFS
      uint256 public fcfsMaxCap = 500 * 1e18; // $500 Ma deposit for FCFS
      uint256 public minPurchase = 100 * 1e18; // 100 USDT Minimum Purchase
-     uint256 public maxPurchase = 200 * 1e18; // 200 USDT cap for each whitelisted user     
-    IERC20 public USDT = IERC20(0xd9145CCE52D386f254917e481eB44e9943F39138); //Address of the ERC20 token used for purchase
+     uint256 public maxPurchase = 200 * 1e18; // 200 USDT cap for each whitelisted user
+    uint256 public maxCap = 500 * 1e18; // 200 USDT cap for each whitelisted user
+    uint256 public minCap = 100 * 1e18; // 100 USDT minmumPurchsecap for each whitelisted user
+
+    IERC20 public USDT = IERC20(0xd8b934580fcE35a11B58C6D73aDeE468a2833fa8); //Address of the ERC20 token used for purchase
     
     uint256 public firstRoundDeposits; //total amount deposited by users in Round1
     uint256 public secondRoundDeposits;  //total amount deposited by users in Round2
+   // uint256 public firstRound;  //total amount deposited by users in Round2
+   // uint256 public secondRound;  //total amount deposited by users in Round2
     
     mapping(address => bool) public whitelisted; // True if user is whitelisted
+    mapping(address => bool) public priorityList; // True if user is in priority list
 
     constructor(
          address tokenAddress,
@@ -51,6 +57,31 @@ contract Presale is Ownable {
              availableTokens = _availableTokens;
          }
     
+    /**
+     *  @notice adds a single PriorityList to the sale
+     *  @param _address: address to whitelist
+     */
+    function addPriorityList(address _address) external onlyOwner {
+        priorityList[_address] = true;
+    }
+
+    /**
+     *  @notice adds multiple PriorityList to the sale
+     *  @param _addresses: dynamic array of addresses to PriorityList
+     */
+    function addMultiplePriorityList(address[] calldata _addresses) external onlyOwner {
+        require(_addresses.length <= 100,"Please don't add more than 100 addresses at once");
+        for (uint256 i = 0; i < _addresses.length; i++) {
+            priorityList[_addresses[i]] = true;
+        }
+    }
+
+    // Removes an address from priorityList
+     //@param _address: address to remove from whitelist    
+    function removePriorityList(address _address) external onlyOwner {
+        priorityList[_address] = false;
+    }
+
     /**
      *  @notice adds a single whitelist to the sale
      *  @param _address: address to whitelist
@@ -81,11 +112,30 @@ contract Presale is Ownable {
         end = block.timestamp + duration;
     }    
     
+    //Deposits from PriorityList Addresses capped  at maxCap
+    function depositPL(uint USDTAmount) external idoActive(){
+        UserInfo storage firstRound = sales[msg.sender];
+        require( maxCap >= firstRound.amount.add(USDTAmount), "PriorityList address is capped at $500");
+        firstRound.amount = firstRound.amount.add(USDTAmount);
+
+        require(USDTAmount >= minCap && USDTAmount <= maxCap, "Min $100, Max $500");
+        uint tokenAmount = USDTAmount.div(price);
+        require(priorityList[msg.sender] == true, "Sorry! Address not in PriorityList.");        
+        require(tokenAmount <= availableTokens,"Not Enough Token Left for sale");     
+   
+        firstRoundDeposits = firstRoundDeposits.add(USDTAmount);    
+        
+        USDT.transferFrom(msg.sender, address(this), USDTAmount);
+        token.mint(address(this), tokenAmount);
+        sales[msg.sender] = UserInfo( msg.sender, tokenAmount);
+    }
+
+
     //Deposits from Whitelistd Addresses capped  at maxPurchase
-    function deposit(uint USDTAmount) external idoActive(){
-        UserInfo storage firstRoundPurchase = sales[msg.sender];
-        require( maxPurchase >= firstRoundPurchase.amount.add(USDTAmount), "Whilisted address is capped at $200");
-        firstRoundPurchase.amount = firstRoundPurchase.amount.add(USDTAmount);
+    function depositWL(uint USDTAmount) external idoActive(){
+        UserInfo storage firstRound = sales[msg.sender];
+        require( maxPurchase >= firstRound.amount.add(USDTAmount), "Whilisted address is capped at $200");
+        firstRound.amount = firstRound.amount.add(USDTAmount);
 
         require(USDTAmount >= minPurchase && USDTAmount <= maxPurchase, "Min $100, Max $200");
         uint tokenAmount = USDTAmount.div(price);
@@ -100,9 +150,9 @@ contract Presale is Ownable {
     }
 
      //FCFS deposits with Maxbuy but uncapped  
-    function buy(uint USDTAmount) external idoActive(){
-        UserInfo storage secondRoundPurchase = sales[msg.sender];
-        secondRoundPurchase.amount = secondRoundPurchase.amount.add(USDTAmount);
+    function depositFC(uint USDTAmount) external idoActive(){
+        UserInfo storage secondRound = sales[msg.sender];
+        secondRound.amount = secondRound.amount.add(USDTAmount);
         
         require(USDTAmount >= fcfsMinCap && USDTAmount <= fcfsMaxCap, "Min $50, Max $500");
         uint tokenAmount = USDTAmount.div(price);        
@@ -124,18 +174,16 @@ contract Presale is Ownable {
         return firstRoundDeposits.add(secondRoundDeposits);
     }
 
-    //Get Each Users Deposits firstRound
-    function userfirstRoundPurchase(address _user) external view returns ( uint256 ) {
+/**
+    //Get Amount Deposited by Each User
+    function userDeposit(address _user) external view returns ( uint256 ) {
        UserInfo memory firstRoundPurchase = sales[_user];
-        return (firstRoundPurchase.amount);
-    }
-
-    //Get Each Users Deposits SecondRound
-    function userSecondRoundPurchase(address _user) external view returns ( uint256 ) {
        UserInfo memory secondRoundPurchase = sales[_user];
-        return (secondRoundPurchase.amount);
-    }
 
+        return (secondRound.amount);
+    }
+*/
+   
 
      modifier idoActive(){
     require (end > 0 && block.timestamp < end && availableTokens > 0, "ido must be active");
