@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity 0.8.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -17,8 +17,10 @@ contract TokenVesting is Ownable {
         address asset;
     }
 
+
     // user => scheduleId => schedule
     mapping(address => mapping(uint256 => Schedule)) public schedules;
+
     mapping(address => uint256) public numberOfSchedules;
 
     mapping(address => uint256) public locked;
@@ -54,7 +56,7 @@ contract TokenVesting is Ownable {
             vestingWeeks > 0 && 
             vestingWeeks >= cliffWeeks &&
             amount > 0,
-            "Vesting: invalid vesting params"
+            "Ooops!: invalid vesting params"
         );
 
         uint256 currentLocked = locked[asset];
@@ -62,7 +64,7 @@ contract TokenVesting is Ownable {
         // require the token is present
         require(
             IERC20(asset).balanceOf(address(this)) >= currentLocked + amount,
-            "Vesting: Not enough tokens"
+            "Ooops!: Not enough tokens"
         );
 
         // create the schedule
@@ -98,7 +100,7 @@ contract TokenVesting is Ownable {
         uint256 numberOfAccounts = accounts.length;
         require(
             amount.length == numberOfAccounts,
-            "Error: Array lengths differ"
+            "OooPs!: Array lengths differ"
         );
         for (uint256 i = 0; i < numberOfAccounts; i++) {
             vest(
@@ -119,6 +121,7 @@ contract TokenVesting is Ownable {
      */
     function claim(uint256 scheduleNumber) external {
         Schedule storage schedule = schedules[msg.sender][scheduleNumber];
+
         require(
             schedule.cliffTime <= block.timestamp,
             "Vesting: cliff not reached"
@@ -192,11 +195,18 @@ contract TokenVesting is Ownable {
         require(token.transfer(owner(), amount), "Vesting: withdraw failed");
         
     }
-    /**
-    //Create a view to displaytotal vested tokens
-    function totalAmount()
-    return [schedule.totalAmount]
-    */
-    
+
+
+     function UserTotalAmount(uint256 scheduleNumber) external view returns(uint256) {
+         Schedule memory schedule = schedules[msg.sender][scheduleNumber];
+         return (schedule.totalAmount);
+        
+   }
+
+    function userClaimedAmout(uint256 scheduleNumber) external view returns(uint256) {
+         Schedule memory schedule = schedules[msg.sender][scheduleNumber];
+         return (schedule.claimedAmount);        
+   } 
+
 }
 
